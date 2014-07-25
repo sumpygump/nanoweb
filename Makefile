@@ -1,11 +1,11 @@
 
-all: nweb23 nclient
+all: nanoweb nclient
 
-nweb23: nweb23.c
-	gcc nweb23.c -o nweb23
+nanoweb: nanoweb.c
+	gcc nanoweb.c -o nanoweb
 
 nclient: client.c
 	gcc client.c -o nclient
 
 clean:
-	rm nclient nweb23
+	rm nclient nanoweb
