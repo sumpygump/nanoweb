@@ -57,7 +57,7 @@ void logger(int type, char *s1, char *s2, int socket_fd)
     case LOG: (void)sprintf(logbuffer," INFO: %s:%s:%d",s1, s2,socket_fd); break;
     }
     /* No checks here, nothing can be done with a failure anyway */
-    if((fd = open("nweb.log", O_CREAT| O_WRONLY | O_APPEND,0644)) >= 0) {
+    if((fd = open("nanoweb.log", O_CREAT| O_WRONLY | O_APPEND,0644)) >= 0) {
         (void)write(fd,logbuffer,strlen(logbuffer));
         (void)write(fd,"\n",1);
         (void)close(fd);
@@ -118,7 +118,7 @@ void web(int fd, int hit)
     logger(LOG,"SEND",&buffer[5],hit);
     len = (long)lseek(file_fd, (off_t)0, SEEK_END); /* lseek to the file end to find the length */
           (void)lseek(file_fd, (off_t)0, SEEK_SET); /* lseek back to the file start ready for reading */
-          (void)sprintf(buffer,"HTTP/1.1 200 OK\nServer: nweb/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n", VERSION, len, fstr); /* Header + a blank line */
+          (void)sprintf(buffer,"HTTP/1.1 200 OK\nServer: nanoweb/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n", VERSION, len, fstr); /* Header + a blank line */
     logger(LOG,"Header",buffer,hit);
     (void)write(fd,buffer,strlen(buffer));
 
@@ -139,30 +139,30 @@ int main(int argc, char **argv)
     static struct sockaddr_in serv_addr; /* static = initialised to zeros */
 
     if( argc < 3  || argc > 3 || !strcmp(argv[1], "-?") ) {
-        (void)printf("hint: nweb Port-Number Top-Directory\t\tversion %d\n\n"
-    "\tnweb is a small and very safe mini web server\n"
-    "\tnweb only servers out file/web pages with extensions named below\n"
-    "\t and only from the named directory or its sub-directories.\n"
-    "\tThere is no fancy features = safe and secure.\n\n"
-    "\tExample: nweb 8181 /home/nwebdir &\n\n"
-    "\tOnly Supports:", VERSION);
+        (void)printf("Nanoweb version %d\nusage: nanoweb <port-number> <root-directory>\n\n"
+    "  Nanoweb is a small and very safe mini web server\n"
+    "  nanoweb only servers out file/web pages with extensions named below\n"
+    "  and only from the named directory or its sub-directories.\n"
+    "  There are no fancy features = safe and secure.\n\n"
+    "  Example: nanoweb 8181 /home/nwebdir &\n\n"
+    "  Only Supports:", VERSION);
         for(i=0;extensions[i].ext != 0;i++)
             (void)printf(" %s",extensions[i].ext);
 
-        (void)printf("\n\tNot Supported: URLs including \"..\", Java, Javascript, CGI\n"
-    "\tNot Supported: directories / /etc /bin /lib /tmp /usr /dev /sbin \n"
-    "\tNo warranty given or implied\n\tNigel Griffiths nag@uk.ibm.com\n"  );
+        (void)printf("\n  Not Supported: URLs including \"..\", Java, Javascript, CGI\n"
+    "  Not Supported: directories / /etc /bin /lib /tmp /usr /dev /sbin \n"
+    "  No warranty given or implied\n  Nigel Griffiths nag@uk.ibm.com\n");
         exit(0);
     }
     if( !strncmp(argv[2],"/"   ,2 ) || !strncmp(argv[2],"/etc", 5 ) ||
         !strncmp(argv[2],"/bin",5 ) || !strncmp(argv[2],"/lib", 5 ) ||
         !strncmp(argv[2],"/tmp",5 ) || !strncmp(argv[2],"/usr", 5 ) ||
         !strncmp(argv[2],"/dev",5 ) || !strncmp(argv[2],"/sbin",6) ){
-        (void)printf("ERROR: Bad top directory %s, see nweb -?\n",argv[2]);
+        (void)printf("ERROR: Bad root directory %s, see nanoweb -?\n",argv[2]);
         exit(3);
     }
     if(chdir(argv[2]) == -1){
-        (void)printf("ERROR: Can't Change to directory %s\n",argv[2]);
+        (void)printf("ERROR: Can't change to directory %s\n",argv[2]);
         exit(4);
     }
     /* Become deamon + unstopable and no zombies children (= no wait()) */
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
     for(i=0;i<32;i++)
         (void)close(i);        /* close open files */
     (void)setpgrp();        /* break away from process group */
-    logger(LOG,"nweb starting",argv[1],getpid());
+    logger(LOG,"nanoweb starting",argv[1],getpid());
     /* setup the network socket */
     if((listenfd = socket(AF_INET, SOCK_STREAM,0)) <0)
         logger(ERROR, "system call","socket",0);
