@@ -45,7 +45,8 @@ struct {
     {"json","application/json" },
     {"woff","application/font-woff" },
     {"ttf", "application/font-ttf" },
-    {"svg", "application/svg" },
+    {"svg", "image/svg+xml" },
+    {"mp3", "audio/mpeg" },
     {0,0} };
 
 /**
