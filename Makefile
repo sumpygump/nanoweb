@@ -9,3 +9,6 @@ nclient: client.c
 
 clean:
 	rm nclient nanoweb
+
+lint:
+	astyle --suffix=none --options=.astylerc 'nanoweb.c' 'client.c'
