@@ -45,7 +45,7 @@ struct {
     {"json", "application/json"},
     {"woff", "application/font-woff"},
     {"ttf", "application/font-ttf"},
-    {"svg", "application/svg"},
+    {"svg", "image/svg+xml"},
     {"mp3", "audio/mpeg"},
     {0, 0}
 };
@@ -58,27 +58,26 @@ struct {
  * @param char* message Message
  * @param int socket_fd count or PID
  */
-void log_message(int type, char *label, char *message, int socket_fd)
-{
+void log_message(int type, char *label, char *message, int socket_fd) {
     int fd;
-    char logbuffer[BUFSIZE*2];
+    char logbuffer[BUFSIZE * 2];
 
     switch (type) {
-    case ERROR:
-        (void) sprintf(logbuffer, "[ERROR] %d %s:%s Errno=%d exiting pid=%d", getpid(), label, message, errno, getpid());
-        (void) fprintf(stderr, "[ERROR] %d %s:%s Errno=%d\n", getpid(), label, message, errno);
-        break;
-    case FORBIDDEN:
-        (void) write(socket_fd, "HTTP/1.1 403 Forbidden\nContent-Length: 185\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>403 Forbidden</title>\n</head><body>\n<h1>Forbidden</h1>\nThe requested URL, file type or operation is not allowed on this simple static file webserver.\n</body></html>\n", 271);
-        (void) sprintf(logbuffer, "[FORBIDDEN] %d %s:%s", getpid(), label, message);
-        break;
-    case NOTFOUND:
-        (void) write(socket_fd, "HTTP/1.1 404 Not Found\nContent-Length: 136\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>404 Not Found</title>\n</head><body>\n<h1>Not Found</h1>\nThe requested URL was not found on this server.\n</body></html>\n", 224);
-        (void) sprintf(logbuffer, "[NOT FOUND] %d %s:%s", getpid(), label, message);
-        break;
-    case LOG:
-        (void) sprintf(logbuffer, "[INFO] %d %s:%s:%d", getpid(), label, message, socket_fd);
-        break;
+        case ERROR:
+            (void) sprintf(logbuffer, "[ERROR] %d %s:%s Errno=%d exiting pid=%d", getpid(), label, message, errno, getpid());
+            (void) fprintf(stderr, "[ERROR] %d %s:%s Errno=%d\n", getpid(), label, message, errno);
+            break;
+        case FORBIDDEN:
+            (void) write(socket_fd, "HTTP/1.1 403 Forbidden\nContent-Length: 185\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>403 Forbidden</title>\n</head><body>\n<h1>Forbidden</h1>\nThe requested URL, file type or operation is not allowed on this simple static file webserver.\n</body></html>\n", 271);
+            (void) sprintf(logbuffer, "[FORBIDDEN] %d %s:%s", getpid(), label, message);
+            break;
+        case NOTFOUND:
+            (void) write(socket_fd, "HTTP/1.1 404 Not Found\nContent-Length: 136\nConnection: close\nContent-Type: text/html\n\n<html><head>\n<title>404 Not Found</title>\n</head><body>\n<h1>Not Found</h1>\nThe requested URL was not found on this server.\n</body></html>\n", 224);
+            (void) sprintf(logbuffer, "[NOT FOUND] %d %s:%s", getpid(), label, message);
+            break;
+        case LOG:
+            (void) sprintf(logbuffer, "[INFO] %d %s:%s:%d", getpid(), label, message, socket_fd);
+            break;
     }
 
     /* No checks here, nothing can be done with a failure anyway */
@@ -194,12 +193,12 @@ int main(int argc, char **argv) {
 
     if (argc < 3 || argc > 3 || !strcmp(argv[1], "-?")) {
         (void)printf("Nanoweb version %d\nusage: nanoweb <port-number> <root-directory>\n\n"
-            "  Nanoweb is a small and very safe mini web server\n"
-            "  nanoweb only serves files and web pages with extensions named below\n"
-            "  and only from the named directory or its sub-directories.\n"
-            "  There are no fancy features = safe and secure.\n\n"
-            "  Example: nanoweb 8181 /home/nwebdir\n\n", VERSION
-        );
+                     "  Nanoweb is a small and very safe mini web server\n"
+                     "  nanoweb only serves files and web pages with extensions named below\n"
+                     "  and only from the named directory or its sub-directories.\n"
+                     "  There are no fancy features = safe and secure.\n\n"
+                     "  Example: nanoweb 8181 /home/nwebdir\n\n", VERSION
+                    );
 
         (void)printf("  Only Supports:");
 
@@ -208,9 +207,9 @@ int main(int argc, char **argv) {
         }
 
         (void)printf("\n  Not Supported: URLs including \"..\", Java, Javascript, CGI\n"
-            "  Not Supported: directories / /etc /bin /lib /tmp /usr /dev /sbin \n"
-            "  No warranty given or implied\n  Nigel Griffiths nag@uk.ibm.com\n"
-        );
+                     "  Not Supported: directories / /etc /bin /lib /tmp /usr /dev /sbin \n"
+                     "  No warranty given or implied\n  Nigel Griffiths nag@uk.ibm.com\n"
+                    );
 
         exit(0);
     }
@@ -222,15 +221,15 @@ int main(int argc, char **argv) {
     }
 
     if (!strncmp(argv[2], "/", 2) || !strncmp(argv[2], "/etc", 5)
-        || !strncmp(argv[2], "/bin", 5) || !strncmp(argv[2], "/lib", 5)
-        || !strncmp(argv[2], "/tmp", 5) || !strncmp(argv[2], "/usr", 5)
-        || !strncmp(argv[2], "/dev", 5) || !strncmp(argv[2], "/sbin", 6)
-    ) {
+            || !strncmp(argv[2], "/bin", 5) || !strncmp(argv[2], "/lib", 5)
+            || !strncmp(argv[2], "/tmp", 5) || !strncmp(argv[2], "/usr", 5)
+            || !strncmp(argv[2], "/dev", 5) || !strncmp(argv[2], "/sbin", 6)
+       ) {
         (void)printf("ERROR: Bad root directory %s, see nanoweb -?\n", argv[2]);
         exit(3);
     }
 
-    if (chdir(argv[2]) == -1){
+    if (chdir(argv[2]) == -1) {
         (void)printf("ERROR: Cannot change to directory '%s'\n", argv[2]);
         exit(4);
     }
