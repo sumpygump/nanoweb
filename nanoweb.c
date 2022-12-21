@@ -30,24 +30,25 @@ struct {
     char *ext;
     char *filetype;
 } extensions [] = {
-    {"gif", "image/gif" },
-    {"jpg", "image/jpg" },
-    {"jpeg","image/jpeg"},
-    {"png", "image/png" },
-    {"ico", "image/ico" },
-    {"zip", "image/zip" },
-    {"gz",  "image/gz"  },
-    {"tar", "image/tar" },
-    {"htm", "text/html" },
-    {"html","text/html" },
-    {"css", "text/css" },
-    {"js",  "text/javascript" },
-    {"json","application/json" },
-    {"woff","application/font-woff" },
-    {"ttf", "application/font-ttf" },
-    {"svg", "image/svg+xml" },
-    {"mp3", "audio/mpeg" },
-    {0,0} };
+    {"gif", "image/gif"},
+    {"jpg", "image/jpg"},
+    {"jpeg", "image/jpeg"},
+    {"png", "image/png"},
+    {"ico", "image/ico"},
+    {"zip", "image/zip"},
+    {"gz",  "image/gz"},
+    {"tar", "image/tar"},
+    {"htm", "text/html"},
+    {"html", "text/html"},
+    {"css", "text/css"},
+    {"js",  "text/javascript"},
+    {"json", "application/json"},
+    {"woff", "application/font-woff"},
+    {"ttf", "application/font-ttf"},
+    {"svg", "application/svg"},
+    {"mp3", "audio/mpeg"},
+    {0, 0}
+};
 
 /**
  * Log Message
@@ -87,100 +88,105 @@ void log_message(int type, char *label, char *message, int socket_fd)
         (void)close(fd);
     }
 
-    if (type == ERROR || type == NOTFOUND || type == FORBIDDEN) exit(3);
+    if (type == ERROR || type == NOTFOUND || type == FORBIDDEN) {
+        exit(3);
+    }
 }
 
-/* this is a child web server process, so we can exit on errors */
-void web(int fd, int hit)
-{
+/* This is a child web server process, so we can exit on errors */
+void web(int fd, int hit) {
     int j, file_fd, buflen;
     long i, ret, len;
-    char * fstr;
-    static char buffer[BUFSIZE+1]; /* static so zero filled */
+    char *fstr;
+    static char buffer[BUFSIZE + 1];  /* static so zero filled */
 
-    ret = read(fd, buffer, BUFSIZE); /* read Web request in one go */
-
-    if (ret == 0 || ret == -1) { /* read failure stop now */
+    ret = read(fd, buffer, BUFSIZE);  /* read Web request in one go */
+    if (ret == 0 || ret == -1) {  /* read failure stop now */
         log_message(FORBIDDEN, "failed to read browser request", "", fd);
     }
 
-    if (ret > 0 && ret < BUFSIZE) { /* return code is valid chars */
-        buffer[ret] = 0; /* terminate the buffer */
+    if (ret > 0 && ret < BUFSIZE) {  /* return code is valid chars */
+        buffer[ret] = 0;  /* terminate the buffer */
     } else {
         buffer[0] = 0;
     }
 
-    for (i = 0; i <ret; i++) { /* remove CF and LF characters */
+    /* remove CF and LF characters */
+    for (i = 0; i < ret; i++) {
         if (buffer[i] == '\r' || buffer[i] == '\n') {
             buffer[i] = '*';
         }
     }
 
     log_message(LOG, "request", buffer, hit);
-
     if (strncmp(buffer, "GET ", 4) && strncmp(buffer, "get ", 4)) {
         log_message(FORBIDDEN, "Only simple GET operation supported", buffer, fd);
     }
 
-    for (i = 4; i < BUFSIZE; i++) { /* null terminate after the second space to ignore extra stuff */
-        if (buffer[i] == ' ') { /* string is "GET URL " +lots of other stuff */
+    for (i = 4; i < BUFSIZE; i++) {  /* null terminate after the second space to ignore extra stuff */
+        if (buffer[i] == ' ') {  /* string is "GET URL " +lots of other stuff */
             buffer[i] = 0;
             break;
         }
     }
 
-    for (j = 0; j < i - 1; j++) { /* check for illegal parent directory use .. */
+    /* Check for illegal parent directory use .. */
+    for (j = 0; j < i - 1; j++) {
         if (buffer[j] == '.' && buffer[j + 1] == '.') {
             log_message(FORBIDDEN, "Parent directory (..) path names not supported", buffer, fd);
         }
     }
 
+    /* Convert no filename to index file */
     if (!strncmp(&buffer[0], "GET /\0", 6) || !strncmp(&buffer[0], "get /\0", 6)) {
-        /* convert no filename to index file */
-        (void)strcpy(buffer,"GET /index.html");
+        (void)strcpy(buffer, "GET /index.html");
     }
 
-    /* work out the file type and check we support it */
+    /* Work out the file type and check we support it */
     buflen = strlen(buffer);
     fstr = (char *)0;
-
     for (i = 0; extensions[i].ext != 0; i++) {
         len = strlen(extensions[i].ext);
-        if (!strncmp(&buffer[buflen-len], extensions[i].ext, len)) {
-            fstr =extensions[i].filetype;
+        if (!strncmp(&buffer[buflen - len], extensions[i].ext, len)) {
+            fstr = extensions[i].filetype;
             break;
         }
     }
-    
     if (fstr == 0) {
         log_message(FORBIDDEN, "file extension type not supported", buffer, fd);
     }
 
-    if ((file_fd = open(&buffer[5], O_RDONLY)) == -1) { /* open the file for reading */
+    /* Open the file for reading */
+    if ((file_fd = open(&buffer[5], O_RDONLY)) == -1) {
         log_message(NOTFOUND, "failed to open file", &buffer[5], fd);
     }
 
     log_message(LOG, "SEND", &buffer[5], hit);
-    len = (long)lseek(file_fd, (off_t)0, SEEK_END); /* lseek to the file end to find the length */
 
-    (void)lseek(file_fd, (off_t)0, SEEK_SET); /* lseek back to the file start ready for reading */
-    (void)sprintf(buffer,"HTTP/1.1 200 OK\nServer: nanoweb/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n", VERSION, len, fstr); /* Header + a blank line */
+    /* lseek to the file end to find the length */
+    len = (long)lseek(file_fd, (off_t)0, SEEK_END);
 
+    /* lseek back to the file start ready for reading */
+    (void)lseek(file_fd, (off_t)0, SEEK_SET);
+
+    /* Header + a blank line */
+    (void)sprintf(buffer, "HTTP/1.1 200 OK\nServer: nanoweb/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n", VERSION, len, fstr);
     log_message(LOG, "Header", buffer, hit);
     (void)write(fd, buffer, strlen(buffer));
 
-    /* send file in 8KB block - last block may be smaller */
-    while ((ret = read(file_fd, buffer, BUFSIZE)) > 0 ) {
+    /* Send file in 8KB block - last block may be smaller */
+    while ((ret = read(file_fd, buffer, BUFSIZE)) > 0) {
         (void)write(fd, buffer, ret);
     }
 
-    sleep(1); /* allow socket to drain before signalling the socket is closed */
+    /* Allow socket to drain before signalling the socket is closed */
+    sleep(1);
+
     close(fd);
     exit(1);
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     int i, port, pid, listenfd, socketfd, hit;
     socklen_t length;
     static struct sockaddr_in cli_addr; /* static = initialised to zeros */
@@ -230,9 +236,9 @@ int main(int argc, char **argv)
     }
 
     // Become deamon + unstopable and no zombies children (= no wait())
-    /*if (fork() != 0) {
+    if (fork() != 0) {
         return 0; // parent returns OK to shell
-    }*/
+    }
 
     (void)printf("Starting nanoweb server on port %s, root directory '%s', PID %d\n", argv[1], argv[2], getpid());
 
@@ -246,7 +252,7 @@ int main(int argc, char **argv)
         (void)close(i); /* close open files */
     }
 
-    /* setup the network socket */
+    /* Setup the network socket */
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         log_message(ERROR, "system call", "Error creating network socket", 0);
     }
@@ -254,7 +260,7 @@ int main(int argc, char **argv)
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(port);
-    
+
     if (bind(listenfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         log_message(ERROR, "system call", "Error binding to port", 0);
     }
