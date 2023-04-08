@@ -155,13 +155,13 @@ char *generate_index(char *path) {
     int i = 0;
 
     char *temp_file = "/tmp/nanoweb_XXXXXX.html";
+    /* For some reason I couldn't get the template for temp_file to work with mkstemps */
     /*char temp_file[] = "/tmp/nanoweb_XXXXXX.html";*/
     /*int temp_fd = mkstemps(temp_file, 4);*/
     int temp_fd = mkstemp(temp_file);
     if (temp_fd < 1) {
         log_message(LOG, "Error creating temp file for index", temp_file, errno);
     }
-    log_message(LOG, "temp file", temp_file, 0);
     close(temp_fd);
     output_f = fopen(temp_file, "w+");
 
@@ -187,8 +187,8 @@ char *generate_index(char *path) {
     fclose(output_f);
 
     return temp_file;
-    char *filename = malloc(sizeof(char) * (strlen(temp_file)));
-    return filename;
+    /*char *filename = malloc(sizeof(char) * (strlen(temp_file)));*/
+    /*return filename;*/
 }
 
 /* This is a child web server process, so we can exit on errors */
@@ -271,7 +271,6 @@ void web(int fd, int hit) {
     fstr = (char *)0;
     for (i = 0; extensions[i].ext != 0; i++) {
         len = strlen(extensions[i].ext);
-        log_message(LOG, "buf", &path_uri[buflen - len], 0);
         if (!strncmp(&path_uri[buflen - len], extensions[i].ext, len)) {
             fstr = extensions[i].filetype;
             break;
