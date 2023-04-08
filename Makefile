@@ -1,4 +1,3 @@
-
 all: nanoweb nclient
 
 nanoweb: nanoweb.c
@@ -6,6 +5,9 @@ nanoweb: nanoweb.c
 
 nclient: client.c
 	gcc client.c -o nclient
+
+debug: nanoweb.c
+	gcc -Wall -g nanoweb.c -o nanoweb
 
 clean:
 	rm nclient nanoweb

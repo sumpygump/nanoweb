@@ -1,15 +1,21 @@
+#define _DEFAULT_SOURCE
+#include <arpa/inet.h>
+#include <ctype.h>
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
 #include <string.h>
-#include <fcntl.h>
-#include <signal.h>
-#include <sys/types.h>
+#include <sys/dir.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#define VERSION   23
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#define VERSION   24
 #define BUFSIZE   8096
 #define ERROR     42
 #define LOG       44
@@ -30,23 +36,29 @@ struct {
     char *ext;
     char *filetype;
 } extensions [] = {
-    {"gif", "image/gif"},
-    {"jpg", "image/jpg"},
-    {"jpeg", "image/jpeg"},
-    {"png", "image/png"},
-    {"ico", "image/ico"},
-    {"zip", "image/zip"},
-    {"gz",  "image/gz"},
-    {"tar", "image/tar"},
-    {"htm", "text/html"},
-    {"html", "text/html"},
-    {"css", "text/css"},
-    {"js",  "text/javascript"},
-    {"json", "application/json"},
-    {"woff", "application/font-woff"},
-    {"ttf", "application/font-ttf"},
-    {"svg", "image/svg+xml"},
-    {"mp3", "audio/mpeg"},
+    {".css", "text/css"},
+    {".csv", "text/csv"},
+    {".gif", "image/gif"},
+    {".gz",  "image/gz"},
+    {".html", "text/html"},
+    {".htm", "text/html"},
+    {".ico", "image/ico"},
+    {".jpeg", "image/jpeg"},
+    {".jpg", "image/jpg"},
+    {".json", "application/json"},
+    {".js",  "text/javascript"},
+    {".log", "text/plain"},
+    {".mp3", "audio/mpeg"},
+    {".ogg", "audio/ogg"},
+    {".png", "image/png"},
+    {".pdf", "application/pdf"},
+    {".svg", "image/svg+xml"},
+    {".tar", "image/tar"},
+    {".ttf", "application/font-ttf"},
+    {".txt", "text/plain"},
+    {".wav", "audio/wav"},
+    {".woff", "application/font-woff"},
+    {".zip", "image/zip"},
     {0, 0}
 };
 
@@ -92,6 +104,93 @@ void log_message(int type, char *label, char *message, int socket_fd) {
     }
 }
 
+/* Function: url_decode */
+char *url_decode(const char *str) {
+    int d = 0; /* whether or not the string is decoded */
+
+    char *dStr = malloc(sizeof(char) * (strlen(str) + 24));
+    char eStr[] = "00"; /* for a hex code */
+
+    strcpy(dStr, str);
+
+    while (!d) {
+        d = 1;
+        int i; /* the counter for the string */
+
+        for (i = 0; i < strlen(dStr); ++i) {
+            if (dStr[i] == '+') {
+                dStr[i] = ' ';
+            }
+            if (dStr[i] == '%') {
+                if (dStr[i + 1] == 0) {
+                    return dStr;
+                }
+
+                if (isxdigit(dStr[i + 1]) && isxdigit(dStr[i + 2])) {
+                    d = 0;
+
+                    /* combine the next to numbers into one */
+                    eStr[0] = dStr[i + 1];
+                    eStr[1] = dStr[i + 2];
+
+                    /* convert it to decimal */
+                    long int x = strtol(eStr, NULL, 16);
+
+                    /* remove the hex */
+                    memmove(&dStr[i + 1], &dStr[i + 3], strlen(&dStr[i + 3]) + 1);
+
+                    dStr[i] = x;
+                }
+            }
+        }
+    }
+
+    return dStr;
+}
+
+char *generate_index(char *path) {
+    FILE *output_f;
+    struct dirent **items;
+    int total;
+    int i = 0;
+
+    char *temp_file = "/tmp/nanoweb_XXXXXX.html";
+    /*char temp_file[] = "/tmp/nanoweb_XXXXXX.html";*/
+    /*int temp_fd = mkstemps(temp_file, 4);*/
+    int temp_fd = mkstemp(temp_file);
+    if (temp_fd < 1) {
+        log_message(LOG, "Error creating temp file for index", temp_file, errno);
+    }
+    log_message(LOG, "temp file", temp_file, 0);
+    close(temp_fd);
+    output_f = fopen(temp_file, "w+");
+
+    fprintf(output_f, "<html><head><style>.contain{max-width:800px;margin:0 auto;border:1px solid #ddd;border-radius:5px;padding:20px;} .hd{font-weight:bold;font-size:16px;}</style>\n");
+    fprintf(output_f, "</head><body><div class=\"contain\"><div class=\"hd\">Directory listing for %s</div>\n<ol>\n", path);
+
+    total = scandir(path, &items, NULL, alphasort);
+    if (total > 0) {
+        while (i < total) {
+            if (items[i]->d_name[0] == '.') {
+                free(items[i]);
+                ++i;
+                continue;
+            }
+            fprintf(output_f, "<li><a href=\"/%s/%s\">%s</a></li>\n", path, items[i]->d_name, items[i]->d_name);
+            free(items[i]);
+            ++i;
+        }
+        free(items);
+    }
+
+    fprintf(output_f, "</ol></div></body></html>");
+    fclose(output_f);
+
+    return temp_file;
+    char *filename = malloc(sizeof(char) * (strlen(temp_file)));
+    return filename;
+}
+
 /* This is a child web server process, so we can exit on errors */
 void web(int fd, int hit) {
     int j, file_fd, buflen;
@@ -110,14 +209,13 @@ void web(int fd, int hit) {
         buffer[0] = 0;
     }
 
-    /* remove CF and LF characters */
+    /* Remove CF and LF characters */
     for (i = 0; i < ret; i++) {
         if (buffer[i] == '\r' || buffer[i] == '\n') {
             buffer[i] = '*';
         }
     }
 
-    log_message(LOG, "request", buffer, hit);
     if (strncmp(buffer, "GET ", 4) && strncmp(buffer, "get ", 4)) {
         log_message(FORBIDDEN, "Only simple GET operation supported", buffer, fd);
     }
@@ -129,6 +227,8 @@ void web(int fd, int hit) {
         }
     }
 
+    log_message(LOG, "request", buffer, hit);
+
     /* Check for illegal parent directory use .. */
     for (j = 0; j < i - 1; j++) {
         if (buffer[j] == '.' && buffer[j + 1] == '.') {
@@ -138,29 +238,56 @@ void web(int fd, int hit) {
 
     /* Convert no filename to index file */
     if (!strncmp(&buffer[0], "GET /\0", 6) || !strncmp(&buffer[0], "get /\0", 6)) {
-        (void)strcpy(buffer, "GET /index.html");
+        (void)strcpy(buffer, "GET  ./");
+    }
+
+    char *path_uri = url_decode(&buffer[5]);
+
+    /* Check if requested resource is a directory */
+    struct stat sb;
+    if (stat(path_uri, &sb) == 0 && S_ISDIR(sb.st_mode)) {
+        log_message(LOG, "Is a directory", path_uri, fd);
+        buflen = strlen(path_uri);
+        char dir_path[buflen + 1];
+        strcpy(dir_path, path_uri); // Save the original path requested
+        if (path_uri[buflen - 1] == '/') {
+            (void)strcat(path_uri, "index.html");
+            dir_path[strlen(dir_path) - 1] = 0; // Strip off ending slash
+        } else {
+            (void)strcat(path_uri, "/index.html");
+        }
+
+        // Attempt to open index file
+        if ((file_fd = open(path_uri, O_RDONLY)) == -1) {
+            log_message(LOG, "No index file in dir; generating index", dir_path, fd);
+            char *index_name = generate_index(dir_path);
+            (void)strcpy(path_uri, index_name);
+            /*free(index_name);*/
+        }
     }
 
     /* Work out the file type and check we support it */
-    buflen = strlen(buffer);
+    buflen = strlen(path_uri);
     fstr = (char *)0;
     for (i = 0; extensions[i].ext != 0; i++) {
         len = strlen(extensions[i].ext);
-        if (!strncmp(&buffer[buflen - len], extensions[i].ext, len)) {
+        log_message(LOG, "buf", &path_uri[buflen - len], 0);
+        if (!strncmp(&path_uri[buflen - len], extensions[i].ext, len)) {
             fstr = extensions[i].filetype;
             break;
         }
     }
     if (fstr == 0) {
-        log_message(FORBIDDEN, "file extension type not supported", buffer, fd);
+        log_message(FORBIDDEN, "File extension type not supported", path_uri, fd);
     }
 
     /* Open the file for reading */
-    if ((file_fd = open(&buffer[5], O_RDONLY)) == -1) {
-        log_message(NOTFOUND, "failed to open file", &buffer[5], fd);
+    if ((file_fd = open(path_uri, O_RDONLY)) == -1) {
+        log_message(NOTFOUND, "failed to open file", path_uri, fd);
     }
 
-    log_message(LOG, "SEND", &buffer[5], hit);
+    log_message(LOG, "SEND", path_uri, hit);
+    free(path_uri);
 
     /* lseek to the file end to find the length */
     len = (long)lseek(file_fd, (off_t)0, SEEK_END);
@@ -170,7 +297,6 @@ void web(int fd, int hit) {
 
     /* Header + a blank line */
     (void)sprintf(buffer, "HTTP/1.1 200 OK\nServer: nanoweb/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n", VERSION, len, fstr);
-    log_message(LOG, "Header", buffer, hit);
     (void)write(fd, buffer, strlen(buffer));
 
     /* Send file in 8KB block - last block may be smaller */
